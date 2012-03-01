@@ -148,6 +148,7 @@ extern void scribe_lock_object(void *object, struct scribe_resource *res,
 extern void scribe_lock_object_key(void *object, struct scribe_res_map *map,
 				   void *key, int res_type, int flags);
 
+struct file;
 extern void scribe_lock_file_no_inode(struct file *file);
 extern void scribe_lock_file_read(struct file *file);
 extern void scribe_lock_file_write(struct file *file);
