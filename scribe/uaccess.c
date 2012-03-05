@@ -39,7 +39,12 @@ void __scribe_forbid_uaccess(struct scribe_ps *scribe)
 
 int is_kernel_copy(void)
 {
-	return !memcmp(&get_fs(), &get_ds(), sizeof(mm_segment_t));
+	mm_segment_t ds, fs;
+
+	/* ds/fs might be constant, make sure we can take their address */
+	ds = get_ds();
+	fs = get_fs();
+	return !memcmp(&fs, &ds, sizeof(mm_segment_t));
 }
 
 struct data_desc {
