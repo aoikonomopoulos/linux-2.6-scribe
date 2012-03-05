@@ -763,6 +763,11 @@ extern void scribe_mem_schedule_out(struct scribe_ps *scribe);
 struct socket;
 extern int scribe_interpose_socket(struct socket *sock);
 
+/* arch-specific code */
+struct pt_regs;
+int scribe_regs(struct scribe_ps *scribe, struct pt_regs *regs);
+int scribe_get_nr_syscall(struct pt_regs *regs);
+
 #else /* CONFIG_SCRIBE */
 
 /* FIXME Make the kernel compile with !CONFIG_SCRIBE ... */
