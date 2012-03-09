@@ -265,8 +265,10 @@ extern struct page *empty_zero_page;
 
 #define pte_offset_map(dir,addr)	(__pte_map(dir, KM_PTE0) + __pte_index(addr))
 #define pte_offset_map_nested(dir,addr)	(__pte_map(dir, KM_PTE1) + __pte_index(addr))
+#define pte_offset_map_nested2(dir,addr) (__pte_map(dir, KM_PTE2) + __pte_index(addr))
 #define pte_unmap(pte)			__pte_unmap(pte, KM_PTE0)
 #define pte_unmap_nested(pte)		__pte_unmap(pte, KM_PTE1)
+#define pte_unmap_nested2(pte)		__pte_unmap(pte, KM_PTE2)
 
 #ifndef CONFIG_HIGHPTE
 #define __pte_map(dir,km)	pmd_page_vaddr(*(dir))
