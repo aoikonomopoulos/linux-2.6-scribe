@@ -10,7 +10,6 @@
 #include "internal.h"
 #include <linux/hash.h>
 #include <linux/magic.h>
-#include <asm/cmpxchg.h>
 #include <linux/fs.h>
 #include <linux/fdtable.h>
 #include <linux/pid_namespace.h>
