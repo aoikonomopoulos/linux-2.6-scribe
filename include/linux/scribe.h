@@ -767,6 +767,7 @@ extern int scribe_interpose_socket(struct socket *sock);
 struct pt_regs;
 int scribe_regs(struct scribe_ps *scribe, struct pt_regs *regs);
 int scribe_get_nr_syscall(struct pt_regs *regs);
+void scribe_mm_switch_pgd(struct mm_struct *mm, pgd_t *pgd);
 
 #else /* CONFIG_SCRIBE */
 

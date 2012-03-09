@@ -1004,7 +1004,7 @@ int scribe_mem_init_st(struct scribe_ps *scribe)
 	scribe->mm = scribe_mm;
 
 	if (current->scribe == scribe)
-		load_cr3(scribe_mm->own_pgd);
+		scribe_mm_switch_pgd(mm, scribe_mm->own_pgd);
 	else
 		maybe_go_multithreaded(mm);
 
@@ -1048,7 +1048,7 @@ void scribe_mem_exit_st(struct scribe_ps *scribe)
 	smp_wmb();
 
 	if (current->scribe == scribe)
-		load_cr3(mm->pgd);
+		scribe_mm_switch_pgd(mm, mm->pgd);
 
 	rm_shadow_mm(scribe_mm, mm);
 	free_scribe_mm(scribe_mm, mm);
@@ -1064,9 +1064,9 @@ void scribe_mem_reload(struct scribe_ps *scribe)
 	 * don't need it.
 	 */
 	if (should_handle_mm(scribe))
-		load_cr3(scribe->mm->own_pgd);
+		scribe_mm_switch_pgd(current->mm, scribe->mm->own_pgd);
 	else
-		load_cr3(current->mm->pgd);
+		scribe_mm_switch_pgd(current->mm, current->mm->pgd);
 }
 
 /********************************************************

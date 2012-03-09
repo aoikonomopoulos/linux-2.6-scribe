@@ -73,3 +73,8 @@ int scribe_get_nr_syscall(struct pt_regs *regs)
 	return nr;
 }
 
+void scribe_mm_switch_pgd(struct mm_struct *mm, pgd_t *pgd)
+{
+	(void)mm;
+	load_cr3(pgd);
+}
