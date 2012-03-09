@@ -1677,4 +1677,6 @@ source "security/Kconfig"
 
 source "crypto/Kconfig"
 
+source "scribe/Kconfig"
+
 source "lib/Kconfig"
