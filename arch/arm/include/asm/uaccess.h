@@ -13,6 +13,7 @@
  */
 #include <linux/string.h>
 #include <linux/thread_info.h>
+#include <linux/scribe_uaccess.h>
 #include <asm/errno.h>
 #include <asm/memory.h>
 #include <asm/domain.h>
@@ -114,6 +115,8 @@ extern int __get_user_4(void *);
 		register const typeof(*(p)) __user *__p asm("r0") = (p);\
 		register unsigned long __r2 asm("r2");			\
 		register int __e asm("r0");				\
+		scribe_pre_uaccess(&x, (p), sizeof(*(p)),		\
+				   SCRIBE_DATA_INPUT);			\
 		switch (sizeof(*(__p))) {				\
 		case 1:							\
 			__get_user_x(__r2, __p, __e, 1, "lr");		\
@@ -126,6 +129,8 @@ extern int __get_user_4(void *);
 			break;						\
 		default: __e = __get_user_bad(); break;			\
 		}							\
+		scribe_post_uaccess(&x, (p), __e ? 0 : sizeof(*(p)),	\
+				    SCRIBE_DATA_INPUT);			\
 		x = (typeof(*(p))) __r2;				\
 		__e;							\
 	})
@@ -148,6 +153,8 @@ extern int __put_user_8(void *, unsigned long long);
 		register const typeof(*(p)) __r2 asm("r2") = (x);	\
 		register const typeof(*(p)) __user *__p asm("r0") = (p);\
 		register int __e asm("r0");				\
+		const typeof(*(p)) __val = (__r2);			\
+		scribe_pre_uaccess(&__val, (p), sizeof(*(p)), 0);	\
 		switch (sizeof(*(__p))) {				\
 		case 1:							\
 			__put_user_x(__r2, __p, __e, 1);		\
@@ -163,6 +170,7 @@ extern int __put_user_8(void *, unsigned long long);
 			break;						\
 		default: __e = __put_user_bad(); break;			\
 		}							\
+		scribe_post_uaccess(&__val, (p), sizeof(*(p)), 0);	\
 		__e;							\
 	})
 
@@ -225,7 +233,7 @@ do {									\
 	(x) = (__typeof__(*(ptr)))__gu_val;				\
 } while (0)
 
-#define __get_user_asm_byte(x,addr,err)				\
+#define __get_user_asm_byte_noscribe(x,addr,err)		\
 	__asm__ __volatile__(					\
 	"1:	ldrbt	%1,[%2]\n"				\
 	"2:\n"							\
@@ -243,25 +251,47 @@ do {									\
 	: "r" (addr), "i" (-EFAULT)				\
 	: "cc")
 
+#define __get_user_asm_byte(x,addr,err)		do {			\
+		u8 __val;						\
+		scribe_pre_uaccess(NULL, (void *)(addr), 1, SCRIBE_DATA_INPUT); \
+		__get_user_asm_byte_noscribe((x), (addr), (err));	\
+		__val = (u8)(unsigned long)(x);				\
+		scribe_post_uaccess(&__val, (void *)(addr), (err) ? 0 : 1, SCRIBE_DATA_INPUT); \
+	} while (0)
+
 #ifndef __ARMEB__
-#define __get_user_asm_half(x,__gu_addr,err)			\
-({								\
-	unsigned long __b1, __b2;				\
-	__get_user_asm_byte(__b1, __gu_addr, err);		\
-	__get_user_asm_byte(__b2, __gu_addr + 1, err);		\
-	(x) = __b1 | (__b2 << 8);				\
+#define __get_user_asm_half(x,__gu_addr,err)				\
+({									\
+	unsigned long __b1, __b2;					\
+	u16 __val;				\
+	scribe_pre_uaccess(NULL, (void *)(__gu_addr), 2,	SCRIBE_DATA_INPUT); \
+	__get_user_asm_byte_noscribe(__b1, __gu_addr, err);		\
+	__get_user_asm_byte_noscribe(__b2, __gu_addr + 1, err);		\
+	(x) = __b1 | (__b2 << 8);					\
+	__val = (u16)(unsigned long)(x);				\
+	scribe_post_uaccess(&__val, (void *)(__gu_addr), err ? 0 : 2,	\
+			   SCRIBE_DATA_INPUT);				\
+	(x);								\
 })
 #else
 #define __get_user_asm_half(x,__gu_addr,err)			\
-({								\
-	unsigned long __b1, __b2;				\
-	__get_user_asm_byte(__b1, __gu_addr, err);		\
-	__get_user_asm_byte(__b2, __gu_addr + 1, err);		\
-	(x) = (__b1 << 8) | __b2;				\
+({									\
+	unsigned long __b1, __b2;					\
+	u16 __val;							\
+	scribe_pre_uaccess(NULL, (void *)(__gu_addr), 2, SCRIBE_DATA_INPUT); \
+	__get_user_asm_byte_noscribe(__b1, __gu_addr, err);		\
+	__get_user_asm_byte_noscribe(__b2, __gu_addr + 1, err);		\
+	(x) = (__b1 << 8) | __b2;					\
+	__val = (u16)(unsigned long)(x);				\
+	scribe_post_uaccess(&__val, (void *)(__gu_addr), (err) ? 0 : 2,	\
+			    SCRIBE_DATA_INPUT);				\
+	(x);
 })
 #endif
 
-#define __get_user_asm_word(x,addr,err)				\
+#define __get_user_asm_word(x,addr,err)		do {		\
+	  u32 __val;							\
+	  scribe_pre_uaccess(NULL, (void *)(addr), 2, SCRIBE_DATA_INPUT); \
 	__asm__ __volatile__(					\
 	"1:	ldrt	%1,[%2]\n"				\
 	"2:\n"							\
@@ -277,7 +307,11 @@ do {									\
 	"	.popsection"					\
 	: "+r" (err), "=&r" (x)					\
 	: "r" (addr), "i" (-EFAULT)				\
-	: "cc")
+	: "cc");						\
+	__val = (u32)(unsigned long)(x);				\
+	scribe_post_uaccess(&__val, (void *)(addr), err ? 0 : 2,	\
+			    SCRIBE_DATA_INPUT);			\
+  } while (0)
 
 #define __put_user(x,ptr)						\
 ({									\
@@ -306,7 +340,7 @@ do {									\
 	}								\
 } while (0)
 
-#define __put_user_asm_byte(x,__pu_addr,err)			\
+#define __put_user_asm_byte_noscribe(x,__pu_addr,err)			\
 	__asm__ __volatile__(					\
 	"1:	strbt	%1,[%2]\n"				\
 	"2:\n"							\
@@ -323,23 +357,38 @@ do {									\
 	: "r" (x), "r" (__pu_addr), "i" (-EFAULT)		\
 	: "cc")
 
+#define __put_user_asm_byte(x,__pu_addr,err)	do {			\
+	  u8 __val = (u8)(unsigned long)(x);				\
+	  scribe_pre_uaccess(&__val, (void *)(__pu_addr), 1, 0);	\
+	  __put_user_asm_byte_noscribe(x, (__pu_addr), (err));		\
+	  scribe_post_uaccess(&__val, (void *)(__pu_addr), err ? 0 : 1, 0); \
+  } while (0)
+
 #ifndef __ARMEB__
 #define __put_user_asm_half(x,__pu_addr,err)			\
 ({								\
 	unsigned long __temp = (unsigned long)(x);		\
-	__put_user_asm_byte(__temp, __pu_addr, err);		\
-	__put_user_asm_byte(__temp >> 8, __pu_addr + 1, err);	\
+	u16 __val = (u16)__temp;				\
+	scribe_pre_uaccess(&__val, (void *)(__pu_addr), 2, 0);	\
+	__put_user_asm_byte_noscribe(__temp, __pu_addr, err);		\
+	__put_user_asm_byte_noscribe(__temp >> 8, __pu_addr + 1, err);	\
+	scribe_post_uaccess(&__val, (void *)(__pu_addr), err ? 0 : 2, 0);	\
 })
 #else
 #define __put_user_asm_half(x,__pu_addr,err)			\
 ({								\
 	unsigned long __temp = (unsigned long)(x);		\
-	__put_user_asm_byte(__temp >> 8, __pu_addr, err);	\
-	__put_user_asm_byte(__temp, __pu_addr + 1, err);	\
+	u16 __val = (u16)__temp;
+	scribe_pre_uaccess(&__val, (void *)(__pu_addr), 2, 0);	\
+	__put_user_asm_byte_noscribe(__temp >> 8, __pu_addr, err);	\
+	__put_user_asm_byte_noscribe(__temp, __pu_addr + 1, err);	\
+	scribe_post_uaccess(&__val, (void *)(__pu_addr), err ? 0 : 2, 0);	\
 })
 #endif
 
-#define __put_user_asm_word(x,__pu_addr,err)			\
+#define __put_user_asm_word(x,__pu_addr,err)		do {	\
+	  u32 __val = (u32)(unsigned long)(x);				\
+	  scribe_pre_uaccess(&__val, (void *)(__pu_addr), 4, 0);	\
 	__asm__ __volatile__(					\
 	"1:	strt	%1,[%2]\n"				\
 	"2:\n"							\
@@ -354,7 +403,9 @@ do {									\
 	"	.popsection"					\
 	: "+r" (err)						\
 	: "r" (x), "r" (__pu_addr), "i" (-EFAULT)		\
-	: "cc")
+	: "cc");						\
+	scribe_post_uaccess(&__val, (void *)(__pu_addr), 4, 0);	\
+  } while (0)
 
 #ifndef __ARMEB__
 #define	__reg_oper0	"%R2"
@@ -364,7 +415,9 @@ do {									\
 #define	__reg_oper1	"%R2"
 #endif
 
-#define __put_user_asm_dword(x,__pu_addr,err)			\
+#define __put_user_asm_dword(x,__pu_addr,err)		do {	\
+	  u64 __val = (u64)(unsigned long)(x);				\
+	  scribe_pre_uaccess(&__val, (void *)(__pu_addr), 8, 0);	\
 	__asm__ __volatile__(					\
  ARM(	"1:	strt	" __reg_oper1 ", [%1], #4\n"	)	\
  ARM(	"2:	strt	" __reg_oper0 ", [%1]\n"	)	\
@@ -383,7 +436,9 @@ do {									\
 	"	.popsection"					\
 	: "+r" (err), "+r" (__pu_addr)				\
 	: "r" (x), "i" (-EFAULT)				\
-	: "cc")
+	: "cc");						\
+	scribe_post_uaccess(&__val, (void *)(__pu_addr), err ? 0 : 8, 0);	\
+  } while (0)
 
 
 #ifdef CONFIG_MMU
