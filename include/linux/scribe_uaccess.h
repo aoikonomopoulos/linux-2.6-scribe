@@ -12,6 +12,7 @@
 #ifndef _LINUX_SCRIBE_UACCESS_H_
 #define _LINUX_SCRIBE_UACCESS_H_
 
+#include <asm/page.h>
 #define SCRIBE_DATA_INPUT		0x01
 #define SCRIBE_DATA_STRING		0x02
 #define SCRIBE_DATA_NON_DETERMINISTIC	0x04
