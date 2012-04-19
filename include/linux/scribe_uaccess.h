@@ -12,7 +12,6 @@
 #ifndef _LINUX_SCRIBE_UACCESS_H_
 #define _LINUX_SCRIBE_UACCESS_H_
 
-#include <asm/page.h>
 #define SCRIBE_DATA_INPUT		0x01
 #define SCRIBE_DATA_STRING		0x02
 #define SCRIBE_DATA_NON_DETERMINISTIC	0x04
@@ -42,8 +41,10 @@
  *	strnlen_user
  */
 
-
+#ifndef __ASSEMBLY__
 #ifdef CONFIG_SCRIBE
+
+#include <asm/page.h>
 
 /* FIXME Those two functions should be inlined */
 extern void scribe_pre_uaccess(const void *data, const void __user *user_ptr,
@@ -87,5 +88,6 @@ static inline int may_be_scribed(struct scribe_ps *scribe)
 #endif /* may_be_scribed */
 
 #endif /* CONFIG_SCRIBE */
+#endif	/* __ASSEMBLY__ */
 
 #endif /* _LINUX_SCRIBE_UACCESS_H_ */
